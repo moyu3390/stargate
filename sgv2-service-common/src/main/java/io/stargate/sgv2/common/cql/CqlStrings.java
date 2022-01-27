@@ -55,12 +55,16 @@ public class CqlStrings {
   /**
    * Quote the given string; single quotes are escaped. If the given string is null, this method
    * returns a quoted empty string ({@code ''}).
-   *
-   * @param value The value to quote.
-   * @return The quoted string.
    */
   public static String quote(String value) {
     return quote(value, '\'');
+  }
+  /**
+   * Quote the given string; double quotes are escaped. If the given string is null, this method
+   * returns a quoted empty string ({@code ""}).
+   */
+  public static String doubleQuote(String value) {
+    return quote(value, '\"');
   }
 
   /**
