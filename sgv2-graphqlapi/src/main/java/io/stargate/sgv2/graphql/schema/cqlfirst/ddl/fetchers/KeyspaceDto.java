@@ -153,7 +153,9 @@ public class KeyspaceDto {
         return buildParameterizedType(
             "TUPLE", true, tuple.getElementsList().toArray(new TypeSpec[0]));
       case BASIC:
-        return ImmutableMap.of("basic", typeSpec.getBasic().name().toUpperCase());
+        TypeSpec.Basic grpc = typeSpec.getBasic();
+        String graphql = (grpc == TypeSpec.Basic.VARCHAR) ? "TEXT" : grpc.name().toUpperCase();
+        return ImmutableMap.of("basic", graphql);
       default:
         throw new IllegalArgumentException("Unsupported type " + typeSpec);
     }

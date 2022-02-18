@@ -110,7 +110,7 @@ public abstract class DdlQueryFetcher extends CassandraFetcher<Boolean> {
         }
         String keyType = decodeType(subTypes.get(0));
         String valueType = decodeType(subTypes.get(1));
-        return String.format(frozen ? "frozen<map<%s,%s>>" : "map<%s,%s>", keyType, valueType);
+        return String.format(frozen ? "frozen<map<%s, %s>>" : "map<%s, %s>", keyType, valueType);
       case "UDT":
         if (name == null) {
           throw new IllegalArgumentException(
@@ -126,7 +126,9 @@ public abstract class DdlQueryFetcher extends CassandraFetcher<Boolean> {
         if (subTypes.isEmpty()) {
           throw new IllegalArgumentException("TUPLE type should have at least one sub type");
         }
-        return subTypes.stream().map(this::decodeType).collect(Collectors.joining(",", "<", ">"));
+        return subTypes.stream()
+            .map(this::decodeType)
+            .collect(Collectors.joining(", ", "frozen<tuple<", ">>"));
     }
     throw new RuntimeException(String.format("Data type %s is not supported", basic));
   }

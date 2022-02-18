@@ -1145,7 +1145,7 @@ public class QueryBuilderImpl {
         .append(
             createColumns.stream()
                 .map(c -> c.cqlName() + " " + CqlStrings.doubleQuoteUdts(c.type()))
-                .collect(Collectors.joining(", ", "(", ")")));
+                .collect(Collectors.joining(", ", " (", ")")));
     return query.toString();
   }
 
