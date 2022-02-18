@@ -25,7 +25,8 @@ public class CqlStringsTest {
     assertThat(CqlStrings.doubleQuoteUdts("int")).isEqualTo("int");
     assertThat(CqlStrings.doubleQuoteUdts("text")).isEqualTo("text");
     assertThat(CqlStrings.doubleQuoteUdts("'CustomType'")).isEqualTo("'CustomType'");
-    assertThat(CqlStrings.doubleQuoteUdts("list<map<int, text>>")).isEqualTo("list<map<int, text>>");
+    assertThat(CqlStrings.doubleQuoteUdts("list<map<int, text>>"))
+        .isEqualTo("list<map<int, text>>");
     assertThat(CqlStrings.doubleQuoteUdts("frozen<set<bigint>>")).isEqualTo("frozen<set<bigint>>");
 
     assertThat(CqlStrings.doubleQuoteUdts("address")).isEqualTo("\"address\"");
