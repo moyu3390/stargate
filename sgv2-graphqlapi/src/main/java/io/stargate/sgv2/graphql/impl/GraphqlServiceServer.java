@@ -75,7 +75,7 @@ public class GraphqlServiceServer extends Application<GraphqlServiceServerConfig
         buildClientFactory(config.stargate.bridge.buildChannel(), environment);
     jersey.register(buildClientFilter(clientFactory));
 
-    GraphqlCache graphqlCache = new GraphqlCache();
+    GraphqlCache graphqlCache = new GraphqlCache(clientFactory.getSchema());
 
     jersey.register(
         new AbstractBinder() {

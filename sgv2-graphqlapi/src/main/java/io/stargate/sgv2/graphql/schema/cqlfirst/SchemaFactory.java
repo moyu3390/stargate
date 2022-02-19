@@ -16,10 +16,21 @@
 package io.stargate.sgv2.graphql.schema.cqlfirst;
 
 import graphql.schema.GraphQLSchema;
+import io.stargate.proto.Schema.CqlKeyspaceDescribe;
 import io.stargate.sgv2.graphql.schema.cqlfirst.ddl.DdlSchemaBuilder;
+import io.stargate.sgv2.graphql.schema.cqlfirst.dml.DmlSchemaBuilder;
 
 /** Single entry point to obtain GraphQL schemas. */
 public class SchemaFactory {
+
+  /**
+   * Builds the GraphQL schema to query and modify data for a particular CQL keyspace.
+   *
+   * <p>This is the API exposed at {@code /graphql/<keyspaceName>}.
+   */
+  public static GraphQLSchema newDmlSchema(CqlKeyspaceDescribe describe) {
+    return new DmlSchemaBuilder(describe).build();
+  }
 
   /**
    * Builds the GraphQL schema to manipulate the Cassandra data model, in other words create, remove

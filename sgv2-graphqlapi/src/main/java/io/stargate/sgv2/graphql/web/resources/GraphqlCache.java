@@ -18,24 +18,72 @@ package io.stargate.sgv2.graphql.web.resources;
 import graphql.GraphQL;
 import graphql.execution.AsyncExecutionStrategy;
 import graphql.schema.GraphQLSchema;
+import io.stargate.proto.Schema.CqlKeyspaceDescribe;
+import io.stargate.sgv2.common.grpc.KeyspaceInvalidationListener;
+import io.stargate.sgv2.common.grpc.StargateBridgeSchema;
 import io.stargate.sgv2.graphql.schema.CassandraFetcherExceptionHandler;
 import io.stargate.sgv2.graphql.schema.cqlfirst.SchemaFactory;
+import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 
 /**
  * Manages the {@link GraphQL} instances used by our REST resources.
  *
  * <p>This includes staying up to date with CQL schema changes.
  */
-public class GraphqlCache {
+public class GraphqlCache implements KeyspaceInvalidationListener {
 
+  private final StargateBridgeSchema schema;
   private final GraphQL ddlGraphql;
+  private final ConcurrentMap<String, CompletionStage<Optional<GraphQL>>> dmlGraphqls =
+      new ConcurrentHashMap<>();
 
-  public GraphqlCache() {
+  public GraphqlCache(StargateBridgeSchema schema) {
+    this.schema = schema;
     this.ddlGraphql = newGraphql(SchemaFactory.newDdlSchema());
   }
 
   public GraphQL getDdl() {
     return ddlGraphql;
+  }
+
+  public CompletionStage<Optional<GraphQL>> getDml(String keyspaceName) {
+    CompletionStage<Optional<GraphQL>> existing = dmlGraphqls.get(keyspaceName);
+    if (existing != null) {
+      return existing;
+    }
+    CompletableFuture<Optional<GraphQL>> mine = new CompletableFuture<>();
+    existing = dmlGraphqls.putIfAbsent(keyspaceName, mine);
+    if (existing != null) {
+      return existing;
+    }
+    loadAsync(keyspaceName, mine);
+    return mine;
+  }
+
+  @Override
+  public void onKeyspaceInvalidated(String keyspaceName) {
+    dmlGraphqls.remove(keyspaceName);
+  }
+
+  private void loadAsync(String keyspaceName, CompletableFuture<Optional<GraphQL>> toComplete) {
+    schema
+        .getKeyspaceAsync(keyspaceName)
+        .thenAccept(cqlSchema -> toComplete.complete(buildDml(cqlSchema)))
+        .exceptionally(
+            throwable -> {
+              // Surface to the caller, but don't leave a failed entry in the cache
+              toComplete.completeExceptionally(throwable);
+              dmlGraphqls.remove(keyspaceName);
+              return null;
+            });
+  }
+
+  private Optional<GraphQL> buildDml(CqlKeyspaceDescribe cqlSchema) {
+    return Optional.ofNullable(cqlSchema).map(s -> newGraphql(SchemaFactory.newDmlSchema(s)));
   }
 
   private static GraphQL newGraphql(GraphQLSchema schema) {

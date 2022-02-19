@@ -1365,7 +1365,7 @@ public class QueryBuilderImpl {
     }
 
     if (limit != null) {
-      builder.append(" LIMIT ").append(formatValue(perPartitionLimit));
+      builder.append(" LIMIT ").append(formatValue(limit));
     }
 
     if (allowFiltering) {
@@ -1386,8 +1386,9 @@ public class QueryBuilderImpl {
       hasAnonymousMarkers = true;
       checkNoMixedMarkers();
       return ((Marker<T>) value);
-    } else if (value instanceof Value) {
-      String markerName = addBoundValue(name, ((Value) value));
+    } else if (value == null || value instanceof Value) {
+      Value grpcValue = (value == null) ? io.stargate.grpc.Values.NULL : (Value) value;
+      String markerName = addBoundValue(name, grpcValue);
       checkNoMixedMarkers();
       return new Marker<>(markerName);
     } else {

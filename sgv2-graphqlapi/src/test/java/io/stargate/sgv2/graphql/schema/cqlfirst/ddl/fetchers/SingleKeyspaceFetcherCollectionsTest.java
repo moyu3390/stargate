@@ -2,11 +2,11 @@ package io.stargate.sgv2.graphql.schema.cqlfirst.ddl.fetchers;
 
 import static org.junit.jupiter.params.provider.Arguments.arguments;
 
-import com.google.common.collect.ImmutableMap;
-import io.stargate.proto.Schema;
+import com.google.common.collect.ImmutableList;
+import io.stargate.proto.Schema.CqlKeyspaceDescribe;
 import io.stargate.sgv2.graphql.schema.SampleKeyspaces;
 import io.stargate.sgv2.graphql.schema.cqlfirst.ddl.DdlTestBase;
-import java.util.Map;
+import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
@@ -15,8 +15,8 @@ import org.junit.jupiter.params.provider.MethodSource;
 public class SingleKeyspaceFetcherCollectionsTest extends DdlTestBase {
 
   @Override
-  protected Map<String, Schema.CqlKeyspaceDescribe> getCqlSchema() {
-    return ImmutableMap.of("collections", SampleKeyspaces.COLLECTIONS);
+  protected List<CqlKeyspaceDescribe> getCqlSchema() {
+    return ImmutableList.of(SampleKeyspaces.COLLECTIONS);
   }
 
   @ParameterizedTest

@@ -22,6 +22,7 @@ import static org.mockito.Mockito.when;
 import static org.mockito.quality.Strictness.LENIENT;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.common.collect.ImmutableMap;
 import graphql.ExecutionInput;
 import graphql.ExecutionResult;
 import graphql.GraphQL;
@@ -29,14 +30,20 @@ import graphql.GraphQLError;
 import graphql.execution.AsyncExecutionStrategy;
 import graphql.schema.GraphQLSchema;
 import io.stargate.proto.QueryOuterClass.Query;
+import io.stargate.proto.QueryOuterClass.QueryParameters;
 import io.stargate.proto.QueryOuterClass.Response;
+import io.stargate.proto.QueryOuterClass.Value;
+import io.stargate.proto.QueryOuterClass.Values;
 import io.stargate.proto.Schema.CqlKeyspaceDescribe;
 import io.stargate.sgv2.common.grpc.StargateBridgeClient;
 import io.stargate.sgv2.graphql.web.resources.StargateGraphqlContext;
 import java.io.IOException;
 import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -51,19 +58,21 @@ import org.mockito.junit.jupiter.MockitoSettings;
 public abstract class GraphqlTestBase {
 
   private GraphQL graphql;
-  private GraphQLSchema graphqlSchema;
+  protected GraphQLSchema graphqlSchema;
   @Mock private StargateBridgeClient bridge;
   @Captor private ArgumentCaptor<Query> queryCaptor;
 
   protected abstract GraphQLSchema createGraphqlSchema();
 
-  protected Map<String, CqlKeyspaceDescribe> getCqlSchema() {
-    return Collections.emptyMap();
+  protected List<CqlKeyspaceDescribe> getCqlSchema() {
+    return Collections.emptyList();
   }
 
   @BeforeEach
   public void setupEnvironment() {
-    Map<String, CqlKeyspaceDescribe> cqlSchema = getCqlSchema();
+    Map<String, CqlKeyspaceDescribe> cqlSchema =
+        getCqlSchema().stream()
+            .collect(Collectors.toMap(d -> d.getCqlKeyspace().getName(), Function.identity()));
     when(bridge.getKeyspace(anyString()))
         .thenAnswer(
             i -> {
@@ -100,7 +109,7 @@ public abstract class GraphqlTestBase {
             .build();
   }
 
-  private ExecutionResult executeGraphql(String query) {
+  protected ExecutionResult executeGraphql(String query) {
     StargateGraphqlContext context = mock(StargateGraphqlContext.class);
     when(context.getBridge()).thenReturn(bridge);
     return graphql.execute(ExecutionInput.newExecutionInput(query).context(context).build());
@@ -113,10 +122,36 @@ public abstract class GraphqlTestBase {
     assertThat(getCapturedCql()).isEqualTo(expectedCqlQuery);
   }
 
-  private String getCapturedCql() {
+  /** Executes a GraphQL query and asserts that it generates the given CQL query. */
+  protected void assertQuery(
+      String graphqlQuery, String expectedCqlQuery, Map<String, Value> expectedValues) {
+    ExecutionResult result = executeGraphql(graphqlQuery);
+    assertThat(result.getErrors()).isEmpty();
+    assertThat(getCapturedCql()).isEqualTo(expectedCqlQuery);
+    assertThat(getCapturedValues()).isEqualTo(expectedValues);
+  }
+
+  protected Query getCapturedQuery() {
     Query query = queryCaptor.getValue();
     assertThat(query).isNotNull();
-    return query.getCql();
+    return query;
+  }
+
+  protected String getCapturedCql() {
+    return getCapturedQuery().getCql();
+  }
+
+  protected QueryParameters getCapturedParameters() {
+    return getCapturedQuery().getParameters();
+  }
+
+  protected Map<String, Value> getCapturedValues() {
+    Values values = getCapturedQuery().getValues();
+    ImmutableMap.Builder<String, Value> map = ImmutableMap.builder();
+    for (int i = 0; i < values.getValueNamesCount(); i++) {
+      map.put(values.getValueNames(i), values.getValues(i));
+    }
+    return map.build();
   }
 
   /** Executes a GraphQL query and asserts that it returns the given JSON response. */

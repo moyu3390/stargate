@@ -15,6 +15,7 @@
  */
 package io.stargate.sgv2.graphql.schema;
 
+import static io.stargate.proto.QueryOuterClass.TypeSpec.Basic.FLOAT;
 import static io.stargate.proto.QueryOuterClass.TypeSpec.Basic.INT;
 import static io.stargate.proto.QueryOuterClass.TypeSpec.Basic.VARCHAR;
 
@@ -73,6 +74,17 @@ public class SampleKeyspaces {
               table("NestedCollections")
                   .addPartitionKeyColumns(column("k", INT))
                   .addColumns(column("c", map(basic(INT), list(set(basic(VARCHAR)))))))
+          .build();
+
+  public static final CqlKeyspaceDescribe IOT =
+      keyspace("iot")
+          .addTables(
+              table("readings")
+                  .addPartitionKeyColumns(column("id", INT))
+                  .addClusteringKeyColumns(column("year", INT))
+                  .addClusteringKeyColumns(column("month", INT))
+                  .addClusteringKeyColumns(column("day", INT))
+                  .addColumns(column("value", FLOAT)))
           .build();
 
   private static CqlKeyspaceDescribe.Builder keyspace(String name) {
