@@ -16,6 +16,7 @@
 package io.stargate.sgv2.graphql.schema.cqlfirst.ddl.fetchers;
 
 import graphql.schema.DataFetchingEnvironment;
+import io.stargate.proto.QueryOuterClass.Query;
 import io.stargate.sgv2.common.cql.builder.Column;
 import io.stargate.sgv2.common.cql.builder.Column.Kind;
 import io.stargate.sgv2.common.cql.builder.QueryBuilder;
@@ -24,7 +25,7 @@ import java.util.Map;
 
 public class CreateTableFetcher extends TableFetcher {
   @Override
-  protected String buildCql(
+  protected Query buildQuery(
       DataFetchingEnvironment environment, String keyspaceName, String tableName) {
     Boolean ifNotExists = environment.getArgument("ifNotExists");
     List<Map<String, Object>> partitionKeys = environment.getArgument("partitionKeys");

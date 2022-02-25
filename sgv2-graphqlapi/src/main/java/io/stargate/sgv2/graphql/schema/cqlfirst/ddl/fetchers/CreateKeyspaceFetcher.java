@@ -16,6 +16,7 @@
 package io.stargate.sgv2.graphql.schema.cqlfirst.ddl.fetchers;
 
 import graphql.schema.DataFetchingEnvironment;
+import io.stargate.proto.QueryOuterClass.Query;
 import io.stargate.sgv2.common.cql.builder.QueryBuilder;
 import io.stargate.sgv2.common.cql.builder.Replication;
 import io.stargate.sgv2.graphql.web.resources.StargateGraphqlContext;
@@ -26,7 +27,7 @@ import java.util.Map;
 public class CreateKeyspaceFetcher extends DdlQueryFetcher {
 
   @Override
-  protected String buildCql(DataFetchingEnvironment environment, StargateGraphqlContext context) {
+  protected Query buildQuery(DataFetchingEnvironment environment, StargateGraphqlContext context) {
     String keyspaceName = environment.getArgument("name");
 
     boolean ifNotExists = environment.getArgumentOrDefault("ifNotExists", Boolean.FALSE);

@@ -16,6 +16,7 @@
 package io.stargate.sgv2.graphql.schema.cqlfirst.ddl.fetchers;
 
 import graphql.schema.DataFetchingEnvironment;
+import io.stargate.proto.QueryOuterClass.Query;
 import io.stargate.sgv2.common.cql.builder.Column.Kind;
 import io.stargate.sgv2.common.cql.builder.QueryBuilder;
 import java.util.List;
@@ -24,7 +25,7 @@ import java.util.Map;
 public class AlterTableAddFetcher extends TableFetcher {
 
   @Override
-  protected String buildCql(
+  protected Query buildQuery(
       DataFetchingEnvironment environment, String keyspaceName, String tableName) {
     List<Map<String, Object>> toAdd = environment.getArgument("toAdd");
     if (toAdd.isEmpty()) {

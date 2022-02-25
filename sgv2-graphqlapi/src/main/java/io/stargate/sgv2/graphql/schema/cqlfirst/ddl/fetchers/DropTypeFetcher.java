@@ -16,13 +16,14 @@
 package io.stargate.sgv2.graphql.schema.cqlfirst.ddl.fetchers;
 
 import graphql.schema.DataFetchingEnvironment;
+import io.stargate.proto.QueryOuterClass.Query;
 import io.stargate.sgv2.common.cql.builder.QueryBuilder;
 import io.stargate.sgv2.graphql.web.resources.StargateGraphqlContext;
 
 public class DropTypeFetcher extends DdlQueryFetcher {
 
   @Override
-  protected String buildCql(DataFetchingEnvironment environment, StargateGraphqlContext context) {
+  protected Query buildQuery(DataFetchingEnvironment environment, StargateGraphqlContext context) {
     String keyspaceName = environment.getArgument("keyspaceName");
     String typeName = environment.getArgument("typeName");
 

@@ -37,13 +37,11 @@ public abstract class DdlQueryFetcher extends CassandraFetcher<Boolean> {
 
   @Override
   protected Boolean get(DataFetchingEnvironment environment, StargateGraphqlContext context) {
-    context
-        .getBridge()
-        .executeQuery(Query.newBuilder().setCql(buildCql(environment, context)).build());
+    context.getBridge().executeQuery(buildQuery(environment, context));
     return true;
   }
 
-  protected abstract String buildCql(
+  protected abstract Query buildQuery(
       DataFetchingEnvironment environment, StargateGraphqlContext context);
 
   protected String decodeType(Object typeObject) {

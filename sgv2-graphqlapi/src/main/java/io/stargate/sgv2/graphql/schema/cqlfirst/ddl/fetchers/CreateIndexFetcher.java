@@ -16,13 +16,14 @@
 package io.stargate.sgv2.graphql.schema.cqlfirst.ddl.fetchers;
 
 import graphql.schema.DataFetchingEnvironment;
+import io.stargate.proto.QueryOuterClass.Query;
 import io.stargate.sgv2.common.cql.builder.CollectionIndexingType;
 import io.stargate.sgv2.common.cql.builder.QueryBuilder;
 
 public class CreateIndexFetcher extends IndexFetcher {
 
   @Override
-  protected String buildCql(
+  protected Query buildQuery(
       DataFetchingEnvironment environment, String keyspaceName, String tableName) {
     String columnName = environment.getArgument("columnName");
 
