@@ -129,6 +129,11 @@ class DefaultStargateBridgeClient implements StargateBridgeClient {
   }
 
   @Override
+  public String decorateKeyspaceName(String keyspaceName) {
+    return addTenantPrefix(keyspaceName);
+  }
+
+  @Override
   public Optional<Schema.CqlTable> getTable(String keyspaceName, String tableName)
       throws UnauthorizedTableException {
     if (!authorizeSchemaRead(SchemaReads.table(keyspaceName, tableName, sourceApi))) {

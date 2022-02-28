@@ -78,9 +78,12 @@ public class DmlSchemaBuilder {
     Order
   }
 
-  public DmlSchemaBuilder(CqlKeyspaceDescribe cqlSchema) {
+  public DmlSchemaBuilder(CqlKeyspaceDescribe cqlSchema, String keyspaceName) {
     this.cqlSchema = cqlSchema;
-    this.keyspaceName = cqlSchema.getCqlKeyspace().getName();
+    // Note that cqlSchema also contains the keyspace name, but it's the decorated one. We pass the
+    // undecorated one all the way from GraphqlCache, because that's what we want to use in the
+    // user-facing GraphQL schema.
+    this.keyspaceName = keyspaceName;
 
     this.nameMapping =
         new NameMapping(cqlSchema.getTablesList(), cqlSchema.getTypesList(), warnings);

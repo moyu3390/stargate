@@ -44,6 +44,14 @@ public class GraphqlServiceStarter {
       description = "whether to disable the GraphQL Playground UI (exposed at /playground)")
   private boolean disablePlayground;
 
+  @Option(
+      name = {"--disable-default-keyspace"},
+      title = "disable-playground",
+      description =
+          "whether to disable the \"default keyspace\" feature (which consists in falling back to "
+              + "the oldest keyspace if not specified in the URL path)")
+  private boolean disableDefaultKeyspace;
+
   public void start() throws Exception {
     if (Strings.isNullOrEmpty(bridgeAdminToken)) {
       throw new IllegalArgumentException("--bridge-token must be specified");
@@ -54,7 +62,12 @@ public class GraphqlServiceStarter {
 
     GraphqlServiceServer server =
         new GraphqlServiceServer(
-            metricsImpl, metricsImpl, httpMetricsTags, bridgeAdminToken, disablePlayground);
+            metricsImpl,
+            metricsImpl,
+            httpMetricsTags,
+            bridgeAdminToken,
+            disablePlayground,
+            disableDefaultKeyspace);
     server.run("server", "config.yaml");
   }
 

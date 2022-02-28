@@ -65,6 +65,20 @@ public interface StargateBridgeClient {
    */
   List<CqlKeyspaceDescribe> getAllKeyspaces();
 
+  /**
+   * Converts an "external" keyspace name known to this client to the "internal" one actually used
+   * by the persistence backend.
+   *
+   * <p>Most of the time, this interface deals with this automatically: for example, the CQL queries
+   * passed to {@link #executeQuery(Query)} expect the external name; so does {@link
+   * #getKeyspace(String)}. Decorating manually is only needed if the caller interacts directly with
+   * {@link StargateBridgeSchema} (which uses internal names).
+   *
+   * <p>Not all persistence backends use such a mapping. If not applicable, this method returns its
+   * argument unchanged.
+   */
+  String decorateKeyspaceName(String keyspaceName);
+
   /** Gets the metadata describing the given table. */
   Optional<CqlTable> getTable(String keyspaceName, String tableName)
       throws UnauthorizedTableException;

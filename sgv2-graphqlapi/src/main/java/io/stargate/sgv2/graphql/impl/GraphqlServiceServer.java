@@ -31,10 +31,12 @@ import io.stargate.sgv2.common.grpc.StargateBridgeClientFactory;
 import io.stargate.sgv2.common.http.CreateStargateBridgeClientFilter;
 import io.stargate.sgv2.common.http.StargateBridgeClientJerseyFactory;
 import io.stargate.sgv2.graphql.web.resources.DdlResource;
+import io.stargate.sgv2.graphql.web.resources.DmlResource;
 import io.stargate.sgv2.graphql.web.resources.GraphqlCache;
 import io.stargate.sgv2.graphql.web.resources.PlaygroundResource;
 import java.util.Collections;
 import java.util.EnumSet;
+import java.util.Optional;
 import javax.servlet.DispatcherType;
 import javax.servlet.FilterRegistration;
 import javax.ws.rs.core.MediaType;
@@ -52,18 +54,21 @@ public class GraphqlServiceServer extends Application<GraphqlServiceServerConfig
   private final HttpMetricsTagProvider httpMetricsTagProvider;
   private final String bridgeAdminToken;
   private final boolean disablePlayground;
+  private final boolean disableDefaultKeyspace;
 
   public GraphqlServiceServer(
       Metrics metrics,
       MetricsScraper metricsScraper,
       HttpMetricsTagProvider httpMetricsTagProvider,
       String bridgeAdminToken,
-      boolean enableGraphqlPlayground) {
+      boolean enableGraphqlPlayground,
+      boolean disableDefaultKeyspace) {
     this.metrics = metrics;
     this.metricsScraper = metricsScraper;
     this.httpMetricsTagProvider = httpMetricsTagProvider;
     this.bridgeAdminToken = bridgeAdminToken;
     this.disablePlayground = enableGraphqlPlayground;
+    this.disableDefaultKeyspace = disableDefaultKeyspace;
   }
 
   @Override
@@ -75,7 +80,11 @@ public class GraphqlServiceServer extends Application<GraphqlServiceServerConfig
         buildClientFactory(config.stargate.bridge.buildChannel(), environment);
     jersey.register(buildClientFilter(clientFactory));
 
-    GraphqlCache graphqlCache = new GraphqlCache(clientFactory.getSchema());
+    GraphqlCache graphqlCache =
+        new GraphqlCache(
+            clientFactory.newClient(bridgeAdminToken, Optional.empty()),
+            clientFactory.getSchema(),
+            disableDefaultKeyspace);
 
     jersey.register(
         new AbstractBinder() {
@@ -88,6 +97,7 @@ public class GraphqlServiceServer extends Application<GraphqlServiceServerConfig
           }
         });
     environment.jersey().register(DdlResource.class);
+    environment.jersey().register(DmlResource.class);
 
     if (!disablePlayground) {
       environment.jersey().register(PlaygroundResource.class);
