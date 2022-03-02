@@ -29,9 +29,11 @@ import graphql.GraphQL;
 import graphql.GraphQLError;
 import graphql.execution.AsyncExecutionStrategy;
 import graphql.schema.GraphQLSchema;
+import io.stargate.proto.QueryOuterClass.Batch;
 import io.stargate.proto.QueryOuterClass.Query;
 import io.stargate.proto.QueryOuterClass.QueryParameters;
 import io.stargate.proto.QueryOuterClass.Response;
+import io.stargate.proto.QueryOuterClass.ResultSet;
 import io.stargate.proto.QueryOuterClass.Value;
 import io.stargate.proto.QueryOuterClass.Values;
 import io.stargate.proto.Schema.CqlKeyspaceDescribe;
@@ -42,6 +44,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.assertj.core.api.Assertions;
@@ -61,6 +64,8 @@ public abstract class GraphqlTestBase {
   protected GraphQLSchema graphqlSchema;
   @Mock private StargateBridgeClient bridge;
   @Captor private ArgumentCaptor<Query> queryCaptor;
+  @Captor private ArgumentCaptor<Batch> batchCaptor;
+  private volatile Response response;
 
   protected abstract GraphQLSchema createGraphqlSchema();
 
@@ -100,7 +105,14 @@ public abstract class GraphqlTestBase {
                               .findFirst());
             });
 
-    when(bridge.executeQuery(queryCaptor.capture())).thenReturn(Response.newBuilder().build());
+    response = Response.newBuilder().build();
+    when(bridge.executeQuery(queryCaptor.capture())).thenAnswer(i -> response);
+    when(bridge.executeQueryAsync(queryCaptor.capture()))
+        .thenAnswer(i -> CompletableFuture.completedFuture(response));
+
+    when(bridge.executeBatch(batchCaptor.capture())).thenAnswer(i -> response);
+    when(bridge.executeBatchAsync(batchCaptor.capture()))
+        .thenAnswer(i -> CompletableFuture.completedFuture(response));
 
     graphqlSchema = createGraphqlSchema();
     graphql =
@@ -109,9 +121,15 @@ public abstract class GraphqlTestBase {
             .build();
   }
 
+  /** Mocks the response to future CQL queries. Note that this is reset before each test method. */
+  protected void mockResultSet(ResultSet resultSet) {
+    response = Response.newBuilder().setResultSet(resultSet).build();
+  }
+
   protected ExecutionResult executeGraphql(String query) {
     StargateGraphqlContext context = mock(StargateGraphqlContext.class);
     when(context.getBridge()).thenReturn(bridge);
+    when(context.getBatchContext()).thenReturn(new StargateGraphqlContext.BatchContext());
     return graphql.execute(ExecutionInput.newExecutionInput(query).context(context).build());
   }
 
@@ -152,6 +170,12 @@ public abstract class GraphqlTestBase {
       map.put(values.getValueNames(i), values.getValues(i));
     }
     return map.build();
+  }
+
+  protected Batch getCapturedBatch() {
+    Batch batch = batchCaptor.getValue();
+    assertThat(batch).isNotNull();
+    return batch;
   }
 
   /** Executes a GraphQL query and asserts that it returns the given JSON response. */

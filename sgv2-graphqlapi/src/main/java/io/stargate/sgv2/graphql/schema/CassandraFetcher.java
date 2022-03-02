@@ -18,10 +18,16 @@ package io.stargate.sgv2.graphql.schema;
 import com.google.protobuf.Int32Value;
 import graphql.schema.DataFetcher;
 import graphql.schema.DataFetchingEnvironment;
+import io.stargate.proto.QueryOuterClass.ColumnSpec;
 import io.stargate.proto.QueryOuterClass.Consistency;
 import io.stargate.proto.QueryOuterClass.ConsistencyValue;
 import io.stargate.proto.QueryOuterClass.QueryParameters;
+import io.stargate.proto.QueryOuterClass.ResultSet;
+import io.stargate.proto.QueryOuterClass.Row;
+import io.stargate.proto.QueryOuterClass.TypeSpec;
+import io.stargate.sgv2.common.grpc.proto.Rows;
 import io.stargate.sgv2.graphql.web.resources.StargateGraphqlContext;
+import java.util.List;
 
 /** Base class for fetchers that access the Cassandra backend. */
 public abstract class CassandraFetcher<ResultT> implements DataFetcher<ResultT> {
@@ -51,4 +57,23 @@ public abstract class CassandraFetcher<ResultT> implements DataFetcher<ResultT> 
 
   protected abstract ResultT get(
       DataFetchingEnvironment environment, StargateGraphqlContext context) throws Exception;
+
+  protected boolean isApplied(ResultSet resultSet) {
+    if (resultSet.getRowsCount() == 0) {
+      return true;
+    }
+    return isApplied(resultSet.getRows(0), resultSet.getColumnsList());
+  }
+
+  protected boolean isApplied(Row row, List<ColumnSpec> columns) {
+    int i = Rows.firstIndexOf("[applied]", columns);
+    if (i < 0) {
+      return false;
+    }
+    ColumnSpec column = columns.get(i);
+    if (column.getType().getBasic() != TypeSpec.Basic.BOOLEAN) {
+      return false;
+    }
+    return row.getValues(i).getBoolean();
+  }
 }

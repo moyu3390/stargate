@@ -15,8 +15,18 @@
  */
 package io.stargate.sgv2.graphql.schema;
 
+import static io.stargate.proto.QueryOuterClass.TypeSpec.Basic.BOOLEAN;
+import static io.stargate.proto.QueryOuterClass.TypeSpec.Basic.CUSTOM;
+import static io.stargate.proto.QueryOuterClass.TypeSpec.Basic.DURATION;
 import static io.stargate.proto.QueryOuterClass.TypeSpec.Basic.FLOAT;
 import static io.stargate.proto.QueryOuterClass.TypeSpec.Basic.INT;
+import static io.stargate.proto.QueryOuterClass.TypeSpec.Basic.LINESTRING;
+import static io.stargate.proto.QueryOuterClass.TypeSpec.Basic.POINT;
+import static io.stargate.proto.QueryOuterClass.TypeSpec.Basic.POLYGON;
+import static io.stargate.proto.QueryOuterClass.TypeSpec.Basic.TEXT;
+import static io.stargate.proto.QueryOuterClass.TypeSpec.Basic.TIMEUUID;
+import static io.stargate.proto.QueryOuterClass.TypeSpec.Basic.UNRECOGNIZED;
+import static io.stargate.proto.QueryOuterClass.TypeSpec.Basic.UUID;
 import static io.stargate.proto.QueryOuterClass.TypeSpec.Basic.VARCHAR;
 
 import io.stargate.proto.QueryOuterClass.ColumnSpec;
@@ -48,6 +58,16 @@ public class SampleKeyspaces {
           .addTypes(UDT_A)
           .addTypes(UDT_B)
           .addTables(table("TestTable").addPartitionKeyColumns(column("a", frozen(UDT_A))))
+          .build();
+
+  public static final CqlKeyspaceDescribe TUPLES =
+      keyspace("tuples_ks")
+          .addTables(
+              table("tuples")
+                  .addPartitionKeyColumns(column("id", INT))
+                  .addColumns(column("value0", tuple(FLOAT, FLOAT)))
+                  .addColumns(column("value1", tuple(UUID, VARCHAR, INT)))
+                  .addColumns(column("value2", tuple(TIMEUUID, BOOLEAN))))
           .build();
 
   public static final CqlKeyspaceDescribe COLLECTIONS =
@@ -86,6 +106,31 @@ public class SampleKeyspaces {
                   .addClusteringKeyColumns(column("day", INT))
                   .addColumns(column("value", FLOAT)))
           .build();
+
+  public static final CqlKeyspaceDescribe SCALARS =
+      keyspace("scalars_ks").addTables(buildScalarsTable()).build();
+
+  private static CqlTable.Builder buildScalarsTable() {
+    CqlTable.Builder table = table("Scalars").addPartitionKeyColumns(column("id", INT));
+    for (Basic basic : Basic.values()) {
+      if (basic == UNRECOGNIZED
+          || basic == POINT
+          || basic == LINESTRING
+          || basic == POLYGON
+          || basic == CUSTOM
+          || basic == TEXT
+          || basic == DURATION) {
+        continue;
+      }
+      String name = getScalarColumnName(basic);
+      table.addColumns(column(name, basic));
+    }
+    return table;
+  }
+
+  public static String getScalarColumnName(Basic basic) {
+    return basic.name().toLowerCase() + "value";
+  }
 
   private static CqlKeyspaceDescribe.Builder keyspace(String name) {
     return CqlKeyspaceDescribe.newBuilder().setCqlKeyspace(CqlKeyspace.newBuilder().setName(name));
@@ -151,6 +196,14 @@ public class SampleKeyspaces {
 
   private static TypeSpec.Udt.Builder udt(String name) {
     return TypeSpec.Udt.newBuilder().setName(name);
+  }
+
+  private static TypeSpec tuple(Basic... elementTypes) {
+    TypeSpec.Tuple.Builder tuple = TypeSpec.Tuple.newBuilder();
+    for (Basic elementType : elementTypes) {
+      tuple.addElements(basic(elementType));
+    }
+    return TypeSpec.newBuilder().setTuple(tuple).build();
   }
 
   private static TypeSpec frozen(TypeSpec.Udt udt) {

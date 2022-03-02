@@ -24,11 +24,14 @@ import com.google.common.collect.ImmutableList;
 import com.google.errorprone.annotations.FormatMethod;
 import com.google.errorprone.annotations.FormatString;
 import graphql.Scalars;
+import graphql.introspection.Introspection;
 import graphql.schema.GraphQLArgument;
+import graphql.schema.GraphQLDirective;
 import graphql.schema.GraphQLEnumType;
 import graphql.schema.GraphQLFieldDefinition;
 import graphql.schema.GraphQLInputObjectField;
 import graphql.schema.GraphQLInputObjectType;
+import graphql.schema.GraphQLInputType;
 import graphql.schema.GraphQLList;
 import graphql.schema.GraphQLNonNull;
 import graphql.schema.GraphQLObjectType;
@@ -42,7 +45,10 @@ import io.stargate.proto.Schema.CqlKeyspaceDescribe;
 import io.stargate.proto.Schema.CqlTable;
 import io.stargate.sgv2.graphql.schema.CassandraFetcher;
 import io.stargate.sgv2.graphql.schema.SchemaConstants;
+import io.stargate.sgv2.graphql.schema.cqlfirst.dml.fetchers.DeleteMutationFetcher;
+import io.stargate.sgv2.graphql.schema.cqlfirst.dml.fetchers.InsertMutationFetcher;
 import io.stargate.sgv2.graphql.schema.cqlfirst.dml.fetchers.QueryFetcher;
+import io.stargate.sgv2.graphql.schema.cqlfirst.dml.fetchers.UpdateMutationFetcher;
 import io.stargate.sgv2.graphql.schema.cqlfirst.dml.fetchers.aggregations.SupportedGraphqlFunction;
 import io.stargate.sgv2.graphql.schema.scalars.CqlScalar;
 import java.util.ArrayList;
@@ -59,6 +65,40 @@ import org.slf4j.LoggerFactory;
 public class DmlSchemaBuilder {
 
   private static final Logger LOG = LoggerFactory.getLogger(DmlSchemaBuilder.class);
+
+  private static final GraphQLInputType MUTATION_OPTIONS =
+      GraphQLInputObjectType.newInputObject()
+          .name("MutationOptions")
+          .description("The execution options for the mutation.")
+          .field(
+              GraphQLInputObjectField.newInputObjectField()
+                  .name("consistency")
+                  .type(
+                      GraphQLEnumType.newEnum()
+                          .name("MutationConsistency")
+                          .value("LOCAL_ONE")
+                          .value("LOCAL_QUORUM")
+                          .value("ALL")
+                          .build())
+                  .defaultValue(CassandraFetcher.DEFAULT_CONSISTENCY.getValue().name())
+                  .build())
+          .field(
+              GraphQLInputObjectField.newInputObjectField()
+                  .name("serialConsistency")
+                  .type(
+                      GraphQLEnumType.newEnum()
+                          .name("SerialConsistency")
+                          .value("SERIAL")
+                          .value("LOCAL_SERIAL")
+                          .build())
+                  .defaultValue(CassandraFetcher.DEFAULT_SERIAL_CONSISTENCY.getValue().name())
+                  .build())
+          .field(
+              GraphQLInputObjectField.newInputObjectField()
+                  .name("ttl")
+                  .type(Scalars.GraphQLInt)
+                  .build())
+          .build();
 
   private final CqlKeyspaceDescribe cqlSchema;
   private final String keyspaceName;
@@ -97,6 +137,7 @@ public class DmlSchemaBuilder {
     GraphQLSchema.Builder builder = new GraphQLSchema.Builder();
 
     List<GraphQLFieldDefinition> queryFields = new ArrayList<>();
+    List<GraphQLFieldDefinition> mutationFields = new ArrayList<>();
 
     // Tables must be iterated one at a time. If a table is unfulfillable, it is skipped
     for (CqlTable table : cqlSchema.getTablesList()) {
@@ -104,25 +145,37 @@ public class DmlSchemaBuilder {
         // This means there was a name clash. We already added a warning in NameMapping.
         continue;
       }
-      Set<GraphQLType> additionalTypes;
-      List<GraphQLFieldDefinition> tableQueryField;
 
       try {
-        additionalTypes = buildTypesForTable(table);
-        tableQueryField = buildQuery(table);
+        builder.additionalTypes(buildTypesForTable(table));
+        queryFields.addAll(buildQuery(table));
+        mutationFields.addAll(buildMutations(table));
       } catch (Exception e) {
         warn(e, "Could not convert table %s, skipping", table.getName());
         continue;
       }
-
-      builder.additionalTypes(additionalTypes);
-      queryFields.addAll(tableQueryField);
     }
 
-    queryFields.add(buildWarnings());
+    addAtomicDirective(builder);
+    addAsyncDirective(builder);
 
     builder.additionalType(buildQueryOptionsInputType());
+
+    queryFields.add(buildWarnings());
     builder.query(buildQueries(queryFields));
+
+    if (mutationFields.isEmpty()) {
+      GraphQLFieldDefinition emptyMutationField =
+          GraphQLFieldDefinition.newFieldDefinition()
+              .name("keyspaceEmptyMutation")
+              .description("Placeholder mutation that is exposed when a keyspace is empty.")
+              .type(Scalars.GraphQLBoolean)
+              .dataFetcher((d) -> true)
+              .build();
+      mutationFields.add(emptyMutationField);
+    }
+    builder.mutation(buildMutationRoot(mutationFields));
+
     return builder.build();
   }
 
@@ -571,6 +624,110 @@ public class DmlSchemaBuilder {
       builder.field(fieldDefinition);
     }
 
+    return builder.build();
+  }
+
+  private List<GraphQLFieldDefinition> buildMutations(CqlTable table) {
+    List<GraphQLFieldDefinition> mutationFields = new ArrayList<>();
+    mutationFields.add(buildDelete(table));
+    mutationFields.add(buildInsert(table));
+    //    mutationFields.add(buildBulkInsert(table));
+    mutationFields.add(buildUpdate(table));
+    return mutationFields;
+  }
+
+  private GraphQLFieldDefinition buildDelete(CqlTable table) {
+    return GraphQLFieldDefinition.newFieldDefinition()
+        .name("delete" + nameMapping.getGraphqlName(table))
+        .description(
+            String.format(
+                "Delete mutation for the table '%s'.%s",
+                table.getName(), primaryKeyDescription(table)))
+        .argument(
+            GraphQLArgument.newArgument()
+                .name("value")
+                .type(
+                    new GraphQLNonNull(
+                        new GraphQLTypeReference(nameMapping.getGraphqlName(table) + "Input"))))
+        .argument(GraphQLArgument.newArgument().name("ifExists").type(Scalars.GraphQLBoolean))
+        .argument(
+            GraphQLArgument.newArgument()
+                .name("ifCondition")
+                .type(new GraphQLTypeReference(nameMapping.getGraphqlName(table) + "FilterInput")))
+        .argument(GraphQLArgument.newArgument().name("options").type(MUTATION_OPTIONS))
+        .type(new GraphQLTypeReference(nameMapping.getGraphqlName(table) + "MutationResult"))
+        .dataFetcher(new DeleteMutationFetcher(keyspaceName, table, nameMapping))
+        .build();
+  }
+
+  private GraphQLFieldDefinition buildInsert(CqlTable table) {
+    return GraphQLFieldDefinition.newFieldDefinition()
+        .name("insert" + nameMapping.getGraphqlName(table))
+        .description(
+            String.format(
+                "Insert mutation for the table '%s'.%s",
+                table.getName(), primaryKeyDescription(table)))
+        .argument(
+            GraphQLArgument.newArgument()
+                .name("value")
+                .type(
+                    new GraphQLNonNull(
+                        new GraphQLTypeReference(nameMapping.getGraphqlName(table) + "Input"))))
+        .argument(GraphQLArgument.newArgument().name("ifNotExists").type(Scalars.GraphQLBoolean))
+        .argument(GraphQLArgument.newArgument().name("options").type(MUTATION_OPTIONS))
+        .type(new GraphQLTypeReference(nameMapping.getGraphqlName(table) + "MutationResult"))
+        .dataFetcher(new InsertMutationFetcher(keyspaceName, table, nameMapping))
+        .build();
+  }
+
+  private GraphQLFieldDefinition buildUpdate(CqlTable table) {
+    return GraphQLFieldDefinition.newFieldDefinition()
+        .name("update" + nameMapping.getGraphqlName(table))
+        .description(
+            String.format(
+                "Update mutation for the table '%s'.%s",
+                table.getName(), primaryKeyDescription(table)))
+        .argument(
+            GraphQLArgument.newArgument()
+                .name("value")
+                .type(
+                    new GraphQLNonNull(
+                        new GraphQLTypeReference(nameMapping.getGraphqlName(table) + "Input"))))
+        .argument(GraphQLArgument.newArgument().name("ifExists").type(Scalars.GraphQLBoolean))
+        .argument(
+            GraphQLArgument.newArgument()
+                .name("ifCondition")
+                .type(new GraphQLTypeReference(nameMapping.getGraphqlName(table) + "FilterInput")))
+        .argument(GraphQLArgument.newArgument().name("options").type(MUTATION_OPTIONS))
+        .type(new GraphQLTypeReference(nameMapping.getGraphqlName(table) + "MutationResult"))
+        .dataFetcher(new UpdateMutationFetcher(keyspaceName, table, nameMapping))
+        .build();
+  }
+
+  private void addAtomicDirective(GraphQLSchema.Builder builder) {
+    builder.additionalDirective(
+        GraphQLDirective.newDirective()
+            .validLocation(Introspection.DirectiveLocation.MUTATION)
+            .name(SchemaConstants.ATOMIC_DIRECTIVE)
+            .description("Instructs the server to apply the mutations in a LOGGED batch")
+            .build());
+  }
+
+  private void addAsyncDirective(GraphQLSchema.Builder builder) {
+    builder.additionalDirective(
+        GraphQLDirective.newDirective()
+            .validLocation(Introspection.DirectiveLocation.MUTATION)
+            .name(SchemaConstants.ASYNC_DIRECTIVE)
+            .description(
+                "Instructs the server to apply the mutations asynchronously without waiting for the result.")
+            .build());
+  }
+
+  private GraphQLObjectType buildMutationRoot(List<GraphQLFieldDefinition> mutationFields) {
+    GraphQLObjectType.Builder builder = GraphQLObjectType.newObject().name("Mutation");
+    for (GraphQLFieldDefinition mutation : mutationFields) {
+      builder.field(mutation);
+    }
     return builder.build();
   }
 

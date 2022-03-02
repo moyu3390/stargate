@@ -110,14 +110,12 @@ public class QueryFetcherTest extends DmlTestBase {
         .isEqualTo(description);
   }
 
-  /* TODO uncomment when mutations are implemented
   @ParameterizedTest
   @MethodSource("mutationDescriptions")
   public void mutationDescriptionTest(String name, String description) {
     assertThat(schema.getMutationType().getFieldDefinition(name).getDescription())
         .isEqualTo(description);
   }
-  */
 
   public static Arguments[] operationsWithOptions() {
     QueryParameters defaults = CassandraFetcher.DEFAULT_PARAMETERS;
@@ -131,7 +129,6 @@ public class QueryFetcherTest extends DmlTestBase {
               .setConsistency(
                   ConsistencyValue.newBuilder().setValue(Consistency.LOCAL_QUORUM).build())
               .build()),
-      /* TODO uncomment when mutations are implemented
       arguments(
           "mutation { insertbooks(value: {title:\"a\", author:\"b\"}, options: { consistency: LOCAL_ONE, serialConsistency: SERIAL}) { applied } }",
           QueryParameters.newBuilder(defaults)
@@ -139,7 +136,6 @@ public class QueryFetcherTest extends DmlTestBase {
               .setSerialConsistency(
                   ConsistencyValue.newBuilder().setValue(Consistency.SERIAL).build())
               .build()),
-       */
       // Verify that the default parameters are pageSize = 100 and cl = LOCAL_QUORUM
       arguments(
           "query { books { values { title, author } } }",
@@ -151,7 +147,6 @@ public class QueryFetcherTest extends DmlTestBase {
                   ConsistencyValue.newBuilder().setValue(Consistency.SERIAL).build())
               .build()),
       arguments("query { books(options: null) { values { title, author } } }", defaults),
-      /* TODO uncomment when mutations are implemented
       arguments(
           "mutation { insertbooks(value: {title:\"a\", author:\"b\"}, options: {serialConsistency: LOCAL_SERIAL}) { applied } }",
           QueryParameters.newBuilder(defaults)
@@ -163,7 +158,6 @@ public class QueryFetcherTest extends DmlTestBase {
           defaults),
       arguments(
           "mutation { insertbooks(value: {title:\"a\", author:\"b\"} ) { applied } }", defaults),
-       */
     };
   }
 
@@ -207,7 +201,6 @@ public class QueryFetcherTest extends DmlTestBase {
     };
   }
 
-  /* TODO uncomment when mutations are implemented
   public static Arguments[] mutationDescriptions() {
     return new Arguments[] {
       arguments(
@@ -225,5 +218,4 @@ public class QueryFetcherTest extends DmlTestBase {
               + "Note that 'title' is the field that corresponds to the table primary key."),
     };
   }
-  */
 }

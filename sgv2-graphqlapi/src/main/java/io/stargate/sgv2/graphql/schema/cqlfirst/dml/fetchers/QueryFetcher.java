@@ -42,12 +42,10 @@ import java.util.stream.Collectors;
 
 public class QueryFetcher extends DmlFetcher<Map<String, Object>> {
 
-  private final String keyspaceName;
   private final AggregationsFetcherSupport aggregationsFetcherSupport;
 
   public QueryFetcher(String keyspaceName, CqlTable table, NameMapping nameMapping) {
-    super(table, nameMapping);
-    this.keyspaceName = keyspaceName;
+    super(keyspaceName, table, nameMapping);
     this.aggregationsFetcherSupport = new AggregationsFetcherSupport(nameMapping, table);
   }
 

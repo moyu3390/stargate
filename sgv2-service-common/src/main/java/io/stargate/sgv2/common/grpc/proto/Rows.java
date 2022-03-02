@@ -58,21 +58,25 @@ public class Rows {
     return getBasic(row, name, columns, Values::varint);
   }
 
-  private static <V> V getBasic(
-      Row row, String name, List<ColumnSpec> columns, Function<Value, V> getter) {
-    int i = firstIndexOf(name, columns);
-    Value value = row.getValues(i);
-    return getter.apply(value);
-  }
-
-  private static int firstIndexOf(String name, List<ColumnSpec> columns) {
+  /** @return the index, or <0 if the column does not exist. */
+  public static int firstIndexOf(String name, List<ColumnSpec> columns) {
     for (int i = 0; i < columns.size(); i++) {
       ColumnSpec column = columns.get(i);
       if (column.getName().equals(name)) {
         return i;
       }
     }
-    throw new IllegalArgumentException(String.format("Column '%s' does not exist", name));
+    return -1;
+  }
+
+  private static <V> V getBasic(
+      Row row, String name, List<ColumnSpec> columns, Function<Value, V> getter) {
+    int i = firstIndexOf(name, columns);
+    if (i < 0) {
+      throw new IllegalArgumentException(String.format("Column '%s' does not exist", name));
+    }
+    Value value = row.getValues(i);
+    return getter.apply(value);
   }
 
   private Rows() {
