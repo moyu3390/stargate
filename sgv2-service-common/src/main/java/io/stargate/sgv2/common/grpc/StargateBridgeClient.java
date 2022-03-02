@@ -21,9 +21,11 @@ import io.stargate.proto.QueryOuterClass.Response;
 import io.stargate.proto.Schema.CqlKeyspaceDescribe;
 import io.stargate.proto.Schema.CqlTable;
 import io.stargate.proto.Schema.SchemaRead;
+import io.stargate.sgv2.common.futures.Futures;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.CompletionStage;
 
 /**
  * The client that allows Stargate services to communicate with the "bridge" to the persistence
@@ -36,14 +38,24 @@ public interface StargateBridgeClient {
    *
    * <p>Authorization is automatically handled by the persistence backend.
    */
-  Response executeQuery(Query request);
+  CompletionStage<Response> executeQueryAsync(Query query);
+
+  /** @see #executeQueryAsync(Query) */
+  default Response executeQuery(Query query) {
+    return Futures.getUninterruptibly(executeQueryAsync(query));
+  }
 
   /**
    * Executes a CQL batch.
    *
    * <p>Authorization is automatically handled by the persistence backend.
    */
-  Response executeBatch(Batch request);
+  CompletionStage<Response> executeBatchAsync(Batch batch);
+
+  /** @see #executeBatchAsync(Batch) */
+  default Response executeBatch(Batch batch) {
+    return Futures.getUninterruptibly(executeBatchAsync(batch));
+  }
 
   /**
    * Gets the metadata describing the given keyspace.
